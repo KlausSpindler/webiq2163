@@ -1,0 +1,53 @@
+version: "3.3"
+
+volumes:
+  webiq:
+    name: "webiq-data"
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - webiq:/var/lib/webiq
+    command: /opt/startup.sh
+    network_mode: "host"
+    extra_hosts:
+      - "licenseAgent:127.0.0.1"
+    depends_on:
+      - licenseAgent
+      - connect
+    restart: unless-stopped
+    healthcheck:
+      test: curl -sf http://localhost:10123 | grep -iq webiq
+      interval: 10s
+      retries: 5
+      start_period: 5s
+      timeout: 10s
+
+  licenseAgent:
+    image: beijerelectronics/webiq:2.16.3-prerelease
+    volumes:
+      - webiq:/var/lib/webiq
+      - /sys:/sys
+    network_mode: "host"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    security_opt:
+      - seccomp:unconfined
+    command: /opt/start-license-agent.sh
+    restart: unless-stopped
+
+  connect:
+    image: beijerelectronics/webiq:2.16.3-prerelease
+    volumes:
+      - webiq:/var/lib/webiq
+    network_mode: "host"
+    extra_hosts:
+      - "licenseAgent:127.0.0.1"
+    command: /opt/start-webiq-server.sh
+    depends_on:
+      - licenseAgent
+    restart: unless-stopped
